@@ -14,25 +14,20 @@ public class PlayerController : MonoBehaviour
     {
         if (isMoving) return;
 
-        // 2. Keyboard.current를 사용하는 신형 방식으로 변경합니다.
         if (Keyboard.current == null) return; // 키보드가 연결되어 있지 않다면 예외 처리
 
-        // W 키 입력 (GetKeyDown 대신 wasPressedThisFrame 사용)
         if (Keyboard.current.wKey.wasPressedThisFrame)
         {
             StartCoroutine(MovePlayer(transform.forward * gridSize));
         }
-        // S 키 입력
         else if (Keyboard.current.sKey.wasPressedThisFrame)
         {
             StartCoroutine(MovePlayer(-transform.forward * gridSize));
         }
-        // A 키 입력
         else if (Keyboard.current.aKey.wasPressedThisFrame)
         {
             StartCoroutine(RotatePlayer(-90f));
         }
-        // D 키 입력
         else if (Keyboard.current.dKey.wasPressedThisFrame)
         {
             StartCoroutine(RotatePlayer(90f));
@@ -56,6 +51,7 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
+        // 이동 후 위치를 소수점 첫째 자리까지 반올림하여 오차를 줄임
         targetPosition.x = Mathf.Round(targetPosition.x * 10f) / 10f;
         targetPosition.y = Mathf.Round(targetPosition.y * 10f) / 10f;
         targetPosition.z = Mathf.Round(targetPosition.z * 10f) / 10f;
