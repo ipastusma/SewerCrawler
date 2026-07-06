@@ -8,6 +8,9 @@ public class PlayerController : MonoBehaviour
     public float moveDuration = 0.3f;   // 한 칸 이동하는 데 걸리는 시간 (초)
     public float rotateDuration = 0.2f;   // 90도 회전하는 데 걸리는 시간 (초)
 
+    [Header("충돌 설정")]
+    public LayerMask wallLayer; // 벽 레이어를 지정하여 충돌 감지
+
     private bool isMoving = false;    // 현재 이동/회전 중인지 여부
 
     void Update()
@@ -18,11 +21,17 @@ public class PlayerController : MonoBehaviour
 
         if (Keyboard.current.wKey.wasPressedThisFrame)
         {
-            StartCoroutine(MovePlayer(transform.forward * gridSize));
+            if (!CheckWall(transform.forward))
+            {
+                StartCoroutine(MovePlayer(transform.forward * gridSize));
+            }
         }
         else if (Keyboard.current.sKey.wasPressedThisFrame)
         {
-            StartCoroutine(MovePlayer(-transform.forward * gridSize));
+            if (!CheckWall(-transform.forward))
+            {
+                StartCoroutine(MovePlayer(-transform.forward * gridSize));
+            }
         }
         else if (Keyboard.current.aKey.wasPressedThisFrame)
         {
@@ -32,6 +41,14 @@ public class PlayerController : MonoBehaviour
         {
             StartCoroutine(RotatePlayer(90f));
         }
+    }
+
+    bool CheckWall(Vector3 direction)
+    {
+        Vector3 rayStart = transform.position;
+
+        bool hasWall = Physics.Raycast(rayStart, direction, gridSize, wallLayer);
+        return hasWall;
     }
 
     // 부드러운 칸 이동을 위한 코루틴
