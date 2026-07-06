@@ -12,6 +12,10 @@ public class PlayerController : MonoBehaviour
     public LayerMask wallLayer; // 벽 레이어를 지정하여 충돌 감지
 
     private bool isMoving = false;    // 현재 이동/회전 중인지 여부
+    public bool IsPlayerMoving()
+    {
+        return isMoving;
+    }
 
     void Update()
     {
