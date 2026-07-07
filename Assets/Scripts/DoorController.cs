@@ -7,6 +7,7 @@ public class DoorController : MonoBehaviour
     [Header("이동 설정")]
     public float openDistance = 1f;    // 이동할 거리
     public float moveDuration = 0.5f;  // 문이 열리는 시간
+    public float maxDistance = 1f;     // 문이 열릴 수 있는 최대 거리
     
     private bool isOpen = false;       // 문이 열려있는지 상태
     private bool isMoving = false;     // 현재 움직이는 중인지 여부
@@ -15,6 +16,7 @@ public class DoorController : MonoBehaviour
     private Vector3 openPosition;      // 열린 위치 (목표 위치)
 
     private PlayerController playerController;
+
 
     void Start()
     {
@@ -46,14 +48,28 @@ public class DoorController : MonoBehaviour
         // 플레이어가 이동 중이면 문을 열지 않음
         if (playerController != null && playerController.IsPlayerMoving()) return;
 
+
+
         // 마우스 위치에서 레이저 발사
         Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
         RaycastHit hit;
 
-        if (Physics.Raycast(ray, out hit))
+        if (Physics.Raycast(ray, out hit, maxDistance))
         {
+            Vector3 playerPos = playerController.transform.position;
+            Vector3 forward = playerController.transform.forward;
+            Vector3 targetCenter = playerPos + forward;
+
+            float minX = targetCenter.x - 0.5f;
+            float maxX = targetCenter.x + 0.5f;
+            float minZ = targetCenter.z - 0.5f;
+            float maxZ = targetCenter.z + 0.5f;
+
+            bool isInsideX = hit.point.x >= minX && hit.point.x <= maxX;
+            bool isInsideZ = hit.point.z >= minZ && hit.point.z <= maxZ;
+            
             // 클릭된 대상이 이 문(나 자신)이라면
-            if (hit.transform == this.transform)
+            if (isInsideX && isInsideZ && hit.transform == this.transform)
             {
                 // 상태에 따라 열기 또는 닫기 실행
                 if (!isOpen)

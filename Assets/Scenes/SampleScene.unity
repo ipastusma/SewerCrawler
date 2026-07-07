@@ -1307,6 +1307,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DoorController
   openDistance: 0.5
   moveDuration: 0.5
+  maxDistance: 1
 --- !u!43 &502985389
 Mesh:
   m_ObjectHideFlags: 0
