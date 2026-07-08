@@ -23,6 +23,12 @@ public class PlayerController : MonoBehaviour
 
         if (Keyboard.current == null) return; // 키보드가 연결되어 있지 않다면 예외 처리
 
+        if (Keyboard.current.tKey.wasPressedThisFrame)
+        {
+            transform.position = new Vector3(0, 0.5f, -4);
+            transform.rotation = Quaternion.Euler(0, 0, 0);
+        }
+
         if (Keyboard.current.wKey.wasPressedThisFrame)
         {
             if (!CheckWall(transform.forward))
