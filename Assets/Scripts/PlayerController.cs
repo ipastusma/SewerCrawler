@@ -25,8 +25,16 @@ public class PlayerController : MonoBehaviour
 
         if (Keyboard.current.tKey.wasPressedThisFrame)
         {
-            transform.position = new Vector3(0, 0.5f, -4);
-            transform.rotation = Quaternion.Euler(0, 0, 0);
+            if (transform.position == new Vector3(0, 0.5f, -4))
+            {
+                transform.position = new Vector3(0.5f, 0, 0.5f);
+                transform.rotation = Quaternion.Euler(0, 90, 0);
+            }
+            else
+            {
+                transform.position = new Vector3(0, 0.5f, -4);
+                transform.rotation = Quaternion.Euler(0, 0, 0);
+            }
         }
 
         if (Keyboard.current.wKey.wasPressedThisFrame)
