@@ -3474,7 +3474,7 @@ GameObject:
   - component: {fileID: 1100002563}
   - component: {fileID: 1100002562}
   m_Layer: 0
-  m_Name: zero point
+  m_Name: Zero Point
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3803,7 +3803,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 6a4003a4a2ccf4a45b578ab61564e896, type: 3}
       propertyPath: m_Name
-      value: computer
+      value: Computer
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3831,7 +3831,7 @@ GameObject:
   - component: {fileID: 1683035075}
   - component: {fileID: 1683035074}
   m_Layer: 0
-  m_Name: table
+  m_Name: Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5010,7 +5010,7 @@ GameObject:
   - component: {fileID: 2042560738}
   - component: {fileID: 2042560737}
   m_Layer: 0
-  m_Name: room
+  m_Name: Room
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

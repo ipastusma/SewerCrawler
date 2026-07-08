@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class MonitorViewCameraController : MonoBehaviour
+public class MonitorInteraction : MonoBehaviour
 {
     [Header("카메라 설정")]
     public Transform monitorViewPoint;  
