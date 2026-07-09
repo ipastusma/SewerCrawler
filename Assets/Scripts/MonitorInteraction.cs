@@ -68,7 +68,7 @@ public class MonitorInteraction : MonoBehaviour
         originalCameraRotation = playerCamera.rotation;
 
         StartCoroutine(MoveCamera(monitorViewPoint.position, monitorViewPoint.rotation));
-        Debug.Log("모니터 화면 확대!");
+        Debug.Log("모니터 화면 확대");
     }
 
     void ZoomOut()
@@ -77,7 +77,7 @@ public class MonitorInteraction : MonoBehaviour
         {
             if (playerController != null) playerController.enabled = true;
             isZoomed = false;
-            Debug.Log("원래 시점으로 복귀.");
+            Debug.Log("원래 시점으로 복귀");
         }));
     }
 
