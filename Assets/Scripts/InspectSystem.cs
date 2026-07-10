@@ -117,6 +117,7 @@ public class InspectSystem : MonoBehaviour
     {
         float elapsedTime = 0;
         float duration = 0.5f;
+        if (dimOverlay != null) dimOverlay.SetActive(false);
 
         // 원래 부모로 복구
         transform.SetParent(originalParent);
@@ -134,7 +135,6 @@ public class InspectSystem : MonoBehaviour
         transform.position = originalPos;
         transform.rotation = originalRot;
 
-        if (dimOverlay != null) dimOverlay.SetActive(false);
         if (playerController != null) playerController.enabled = true;
         isInspecting = false;
     }
