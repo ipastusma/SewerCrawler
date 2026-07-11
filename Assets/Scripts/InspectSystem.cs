@@ -37,18 +37,22 @@ public class InspectSystem : MonoBehaviour
 
     void Update()
     {
-        if (!isInspecting)
+        if (isInspecting)
         {
-            // 1. 일반 상태에서 클릭 감지
-            if (Mouse.current.leftButton.wasPressedThisFrame)
-            {
-                HandleClick();
-            }
+            // 자신이 조사 중인 유일한 오브젝트라면 무조건 드래그 및 ESC 복구 처리
+            HandleInspection();
         }
         else
         {
-            // 2. 조사 중 상태 제어
-            HandleInspection();
+            // 조사 중이 아닐 때만 클릭을 검사
+            // playerController가 null이 아니고 활성화되어 있을 때만 클릭 처리
+            if (playerController != null && playerController.enabled)
+            {
+                if (Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    HandleClick();
+                }
+            }
         }
     }
 
@@ -112,7 +116,7 @@ public class InspectSystem : MonoBehaviour
             inspectionCamera.gameObject.SetActive(true);
         }
 
-        // 물체를 카메라의 자식으로 일시 이동 (카메라가 움직여도 같이 움직이게)
+        // 물체를 카메라의 자식으로 일시 이동 (추후 흔들림 등의 효과가 추가되어 카메라가 움직여도 같이 움직이게 하여 조사 중인 느낌을 주도록)
         transform.SetParent(Camera.main.transform);
 
         float elapsedTime = 0;
