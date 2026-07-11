@@ -10,10 +10,14 @@ public class InspectSystem : MonoBehaviour
     public float transitionSpeed = 5f; // 이동 속도
     public float rotationSpeed = 0.5f; // 회전 감도
 
+    [Header("카메라 설정 (오버레이)")]
+    public Camera inspectionCamera;
+
     private PlayerController playerController;
     private Vector3 originalPos;
     private Quaternion originalRot;
     private Transform originalParent;
+    private int originalLayer;
 
     private bool isInspecting = false;
     private bool isDragging = false;
@@ -23,6 +27,11 @@ public class InspectSystem : MonoBehaviour
         if (Camera.main != null)
         {
             playerController = Camera.main.GetComponentInParent<PlayerController>();
+        }
+
+        if (inspectionCamera != null)
+        {
+            inspectionCamera.gameObject.SetActive(false);
         }
     }
 
@@ -94,6 +103,14 @@ public class InspectSystem : MonoBehaviour
         originalPos = transform.position;
         originalRot = transform.rotation;
         originalParent = transform.parent;
+        originalLayer = gameObject.layer;
+
+        SetLayerRecursively(gameObject, LayerMask.NameToLayer("Inspect"));
+
+        if (inspectionCamera != null)
+        {
+            inspectionCamera.gameObject.SetActive(true);
+        }
 
         // 물체를 카메라의 자식으로 일시 이동 (카메라가 움직여도 같이 움직이게)
         transform.SetParent(Camera.main.transform);
@@ -122,6 +139,8 @@ public class InspectSystem : MonoBehaviour
         // 원래 부모로 복구
         transform.SetParent(originalParent);
 
+        SetLayerRecursively(gameObject, originalLayer);
+
         while (elapsedTime < duration)
         {
             elapsedTime += Time.deltaTime;
@@ -135,7 +154,21 @@ public class InspectSystem : MonoBehaviour
         transform.position = originalPos;
         transform.rotation = originalRot;
 
+        if (inspectionCamera != null)
+        {
+            inspectionCamera.gameObject.SetActive(false);
+        }
+
         if (playerController != null) playerController.enabled = true;
         isInspecting = false;
+    }
+
+    void SetLayerRecursively(GameObject obj, int newLayer)
+    {
+        obj.layer = newLayer;
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursively(child.gameObject, newLayer);
+        }
     }
 }

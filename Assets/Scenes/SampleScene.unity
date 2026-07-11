@@ -2584,7 +2584,7 @@ GameObject:
   - component: {fileID: 625824058}
   - component: {fileID: 625824057}
   m_Layer: 0
-  m_Name: Inspection Camera
+  m_Name: InspectionCamera
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2599,7 +2599,7 @@ Transform:
   m_GameObject: {fileID: 625824055}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -0.25}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2628,7 +2628,7 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
+  m_RenderPostProcessing: 1
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -2670,7 +2670,7 @@ Camera:
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
-  m_FOVAxisMode: 0
+  m_FOVAxisMode: 1
   m_Iso: 200
   m_ShutterSpeed: 0.005
   m_Aperture: 16
@@ -2688,9 +2688,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0.01
   far clip plane: 1000
-  field of view: 60
+  field of view: 67.67275
   orthographic: 0
   orthographic size: 5
   m_Depth: 0
@@ -4532,9 +4532,9 @@ Canvas:
   m_GameObject: {fileID: 862950327}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
-  m_Camera: {fileID: 0}
-  m_PlaneDistance: 100
+  m_RenderMode: 1
+  m_Camera: {fileID: 330585545}
+  m_PlaneDistance: 0.06
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
   m_OverrideSorting: 0
@@ -5025,7 +5025,7 @@ GameObject:
   - component: {fileID: 1019801798}
   - component: {fileID: 1019801797}
   - component: {fileID: 1019801803}
-  m_Layer: 6
+  m_Layer: 0
   m_Name: Item_1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -39125,6 +39125,7 @@ MonoBehaviour:
   dimOverlay: {fileID: 862950327}
   transitionSpeed: 5
   rotationSpeed: 0.5
+  inspectionCamera: {fileID: 0}
 --- !u!1 &1100002561
 GameObject:
   m_ObjectHideFlags: 0
@@ -39432,7 +39433,7 @@ GameObject:
   - component: {fileID: 1247032706}
   - component: {fileID: 1247032705}
   - component: {fileID: 1247032711}
-  m_Layer: 6
+  m_Layer: 0
   m_Name: Item_2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -39790,6 +39791,7 @@ MonoBehaviour:
   dimOverlay: {fileID: 862950327}
   transitionSpeed: 5
   rotationSpeed: 0.5
+  inspectionCamera: {fileID: 0}
 --- !u!43 &1279690364
 Mesh:
   m_ObjectHideFlags: 0
