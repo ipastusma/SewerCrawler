@@ -46,7 +46,7 @@ public class DoorController : MonoBehaviour
     void HandleClick()
     {
         // 플레이어가 이동 중이면 문을 열지 않음
-        if (playerController != null && playerController.IsPlayerMoving()) return;
+        if (playerController != null && (playerController.IsPlayerMoving() || !playerController.enabled)) return;
 
 
 

@@ -21,8 +21,8 @@ public class InspectSystem : MonoBehaviour
     public static List<string> inventoryList = new List<string>();
     public static bool isInventoryOpen = false;
 
-    // 여러 오브젝트가 동시에 키 입력을 중복 처리하는 것을 방지하기 위한 정적 플래그
-    private static bool inventoryToggledThisFrame = false;
+    // 프레임 내 중복 토글 방지를 위한 전역 프레임 기록 변수
+    private static int lastToggleFrame = -1;
 
     private PlayerController playerController;
     private Vector3 originalPos;
@@ -48,39 +48,26 @@ public class InspectSystem : MonoBehaviour
 
     void Update()
     {
-        // 매 프레임 입력 플래그 초기화
-        inventoryToggledThisFrame = false;
-
         if (isInspecting)
         {
-            // 자신이 조사 중인 유일한 오브젝트라면 무조건 드래그 및 ESC 복구 처리
             HandleInspection();
         }
         else
         {
-            // 인벤토리 창이 열려있는 동안에는 다른 행동을 모두 중단하고 E키로 닫기만 허용
-            if (isInventoryOpen)
+            if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
             {
-                if (Keyboard.current.eKey.wasPressedThisFrame && !inventoryToggledThisFrame)
+                // 이번 프레임에 아직 어떤 유물도 토글을 처리하지 않았다면 실행
+                if (Time.frameCount != lastToggleFrame)
                 {
-                    inventoryToggledThisFrame = true;
-                    ToggleInventory(false);
+                    lastToggleFrame = Time.frameCount;
+                    ToggleInventory(!isInventoryOpen);
                 }
-                return;
             }
 
-            // 조사 중이 아닐 때만 클릭을 검사
-            // playerController가 null이 아니고 활성화되어 있을 때만 클릭 처리
-            if (playerController != null && playerController.enabled)
+            // 인벤토리 창이 열려있지 않고 플레이어가 움직일 수 있을 때만 클릭 감지
+            if (!isInventoryOpen && playerController != null && playerController.enabled)
             {
-                // [E] 키 입력 시 인벤토리 열기
-                if (Keyboard.current.eKey.wasPressedThisFrame && !inventoryToggledThisFrame)
-                {
-                    inventoryToggledThisFrame = true;
-                    ToggleInventory(true);
-                }
-                // 마우스 클릭 시 유물 조사 모드 진입
-                else if (Mouse.current.leftButton.wasPressedThisFrame)
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
                 {
                     HandleClick();
                 }

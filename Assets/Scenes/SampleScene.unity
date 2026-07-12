@@ -2877,7 +2877,7 @@ MeshRenderer:
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
   m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 2
+  m_SelectedEditorRenderState: 3
   m_MinimumChartSize: 4
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
@@ -39125,7 +39125,8 @@ MonoBehaviour:
   dimOverlay: {fileID: 862950327}
   transitionSpeed: 5
   rotationSpeed: 0.5
-  inspectionCamera: {fileID: 0}
+  inspectionCamera: {fileID: 625824059}
+  artifactDisplayName: sphere
 --- !u!1 &1100002561
 GameObject:
   m_ObjectHideFlags: 0
@@ -39791,7 +39792,8 @@ MonoBehaviour:
   dimOverlay: {fileID: 862950327}
   transitionSpeed: 5
   rotationSpeed: 0.5
-  inspectionCamera: {fileID: 0}
+  inspectionCamera: {fileID: 625824059}
+  artifactDisplayName: cube
 --- !u!43 &1279690364
 Mesh:
   m_ObjectHideFlags: 0
