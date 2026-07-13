@@ -24,6 +24,9 @@ public class InspectSystem : MonoBehaviour
     // 프레임 내 중복 토글 방지를 위한 전역 프레임 기록 변수
     private static int lastToggleFrame = -1;
 
+    // 프레임 내 조사 모드에서 e키를 눌러 인벤토리에 넣을 때 각 오브젝트별 update문에서 중복 입력되어 바로 인벤토리가 뜨는 것을 방지하기 위한 전역 프레임 기록 변수
+    private static int lastPocketFrame = -1;
+
     private PlayerController playerController;
     private Vector3 originalPos;
     private Quaternion originalRot;
@@ -57,7 +60,7 @@ public class InspectSystem : MonoBehaviour
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
             {
                 // 이번 프레임에 아직 어떤 유물도 토글을 처리하지 않았다면 실행
-                if (Time.frameCount != lastToggleFrame)
+                if (Time.frameCount != lastToggleFrame && Time.frameCount != lastPocketFrame)
                 {
                     lastToggleFrame = Time.frameCount;
                     ToggleInventory(!isInventoryOpen);
@@ -95,6 +98,7 @@ public class InspectSystem : MonoBehaviour
     {
         if (Keyboard.current.eKey.wasPressedThisFrame)
         {
+            lastPocketFrame = Time.frameCount;
             StartCoroutine(PocketArtifact());
             return;
         }
