@@ -1,320 +1,452 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// 조사 가능한 유물의 상태 전환만 담당하는 컨텍스트입니다.
+/// UI와 인벤토리 데이터는 InventoryOverlay로 분리했습니다.
+/// </summary>
 public class InspectSystem : MonoBehaviour
 {
     [Header("조사 설정")]
-    public Transform inspectPoint;    // 카메라 앞의 목적지
-    public GameObject dimOverlay;     // 배경을 어둡게 하는 UI 패널
-    public float transitionSpeed = 5f; // 이동 속도
-    public float rotationSpeed = 0.5f; // 회전 감도
+    public Transform inspectPoint;
+    public GameObject dimOverlay;
+    [Min(0.01f)] public float transitionSpeed = 5f;
+    public float rotationSpeed = 0.5f;
 
-    [Header("카메라 설정 (오버레이)")]
+    [Header("카메라 설정")]
     public Camera inspectionCamera;
 
-    [Header("인벤토리 설정 (프로토타입)")]
-    public string artifactDisplayName = ""; // 인벤토리에 노출될 유물 이름
+    [Header("인벤토리 설정")]
+    public string artifactDisplayName = "";
 
-     // 전역(Static)으로 관리되는 인벤토리 데이터 리스트
-    public static List<string> inventoryList = new List<string>();
-    public static bool isInventoryOpen = false;
-
-    // 프레임 내 중복 토글 방지를 위한 전역 프레임 기록 변수
-    private static int lastToggleFrame = -1;
-
-    // 프레임 내 조사 모드에서 e키를 눌러 인벤토리에 넣을 때 각 오브젝트별 update문에서 중복 입력되어 바로 인벤토리가 뜨는 것을 방지하기 위한 전역 프레임 기록 변수
-    private static int lastPocketFrame = -1;
+    // 기존 코드에서 읽기 용도로 사용하던 API를 유지합니다.
+    public static IReadOnlyList<string> inventoryList => InventoryOverlay.Items;
+    public static bool isInventoryOpen => InventoryOverlay.IsOpen;
+    public static bool IsInspectionInProgress { get; private set; }
 
     private PlayerController playerController;
-    private Vector3 originalPos;
-    private Quaternion originalRot;
-    private Transform originalParent;
-    private int originalLayer;
+    private InventoryOverlay inventory;
+    private Transform mainCameraTransform;
+    private InspectionSnapshot snapshot;
+    private InspectState currentState;
+    private Coroutine transitionRoutine;
 
-    private bool isInspecting = false;
-    private bool isDragging = false;
+    private readonly IdleInspectState idleState = new IdleInspectState();
+    private readonly EnteringInspectState enteringState = new EnteringInspectState();
+    private readonly ActiveInspectState activeState = new ActiveInspectState();
+    private readonly ExitingInspectState exitingState = new ExitingInspectState();
+    private readonly CollectingInspectState collectingState = new CollectingInspectState();
+    private readonly CollectedInspectState collectedState = new CollectedInspectState();
 
-    void Start()
+    internal PlayerController PlayerController => playerController;
+    internal bool IsInventoryOpen => inventory != null && inventory.IsVisible;
+
+    private void Awake()
+    {
+        inventory = InventoryOverlay.GetOrCreate();
+        ChangeState(idleState);
+    }
+
+    private void Start()
     {
         if (Camera.main != null)
         {
-            playerController = Camera.main.GetComponentInParent<PlayerController>();
+            mainCameraTransform = Camera.main.transform;
+            playerController = mainCameraTransform.GetComponentInParent<PlayerController>();
         }
 
         if (inspectionCamera != null)
-        {
             inspectionCamera.gameObject.SetActive(false);
+    }
+
+    private void Update()
+    {
+        currentState.Tick(this);
+    }
+
+    private void OnDisable()
+    {
+        if (currentState != null && currentState != idleState && currentState != collectedState)
+        {
+            RestoreAfterInspection();
+            IsInspectionInProgress = false;
         }
     }
 
-    void Update()
+    internal void ChangeState(InspectState nextState)
     {
-        if (isInspecting)
-        {
-            HandleInspection();
-        }
-        else
-        {
-            if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
-            {
-                // 이번 프레임에 아직 어떤 유물도 토글을 처리하지 않았다면 실행
-                if (Time.frameCount != lastToggleFrame && Time.frameCount != lastPocketFrame)
-                {
-                    lastToggleFrame = Time.frameCount;
-                    ToggleInventory(!isInventoryOpen);
-                }
-            }
+        currentState?.Exit(this);
+        currentState = nextState;
 
-            // 인벤토리 창이 열려있지 않고 플레이어가 움직일 수 있을 때만 클릭 감지
-            if (!isInventoryOpen && playerController != null && playerController.enabled)
-            {
-                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-                {
-                    HandleClick();
-                }
-            }
-        }
+        IsInspectionInProgress = currentState.BlocksInventoryToggle;
+        currentState.Enter(this);
     }
 
-    void HandleClick()
+    internal void ToggleInventory()
     {
-        if (playerController != null && playerController.IsPlayerMoving()) return;
+        inventory.Toggle(playerController);
+    }
+
+    internal void TryStartInspection()
+    {
+        if (IsInventoryOpen || playerController == null || !playerController.enabled || playerController.IsPlayerMoving())
+            return;
+
+        if (Mouse.current == null || Camera.main == null)
+            return;
 
         Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-        RaycastHit hit;
-
-        if (Physics.Raycast(ray, out hit, 2.0f))
-        {
-            if (hit.transform == this.transform)
-            {
-                StartCoroutine(EnterInspectMode());
-            }
-        }
+        if (Physics.Raycast(ray, out RaycastHit hit, 2f) && hit.transform == transform)
+            ChangeState(enteringState);
     }
 
-    void HandleInspection()
+    internal void BeginEnterTransition()
     {
-        if (Keyboard.current.eKey.wasPressedThisFrame)
-        {
-            lastPocketFrame = Time.frameCount;
-            StartCoroutine(PocketArtifact());
-            return;
-        }
-
-        // ESC 키로 탈출
-        if (Keyboard.current.escapeKey.wasPressedThisFrame)
-        {
-            StartCoroutine(ExitInspectMode());
-            return;
-        }
-
-        // 마우스 드래그 회전 로직
-        if (Mouse.current.leftButton.isPressed)
-        {
-            isDragging = true;
-            Vector2 delta = Mouse.current.delta.ReadValue();
-
-            // Y축 이동량으로 X축 회전, X축 이동량으로 Y축 회전
-            transform.Rotate(Vector3.up, -delta.x * rotationSpeed, Space.World);
-            transform.Rotate(Vector3.right, delta.y * rotationSpeed, Space.World);
-        }
-        else
-        {
-            isDragging = false;
-        }
-    }
-
-    IEnumerator EnterInspectMode()
-    {
-        isInspecting = true;
-        if (playerController != null) playerController.enabled = false;
+        snapshot = InspectionSnapshot.Capture(transform);
+        SetPlayerControl(false);
         if (dimOverlay != null) dimOverlay.SetActive(true);
 
-        // 원래 상태 저장
-        originalPos = transform.position;
-        originalRot = transform.rotation;
-        originalParent = transform.parent;
-        originalLayer = gameObject.layer;
-
-        SetLayerRecursively(gameObject, LayerMask.NameToLayer("Inspect"));
+        int inspectLayer = LayerMask.NameToLayer("Inspect");
+        if (inspectLayer >= 0)
+            SetLayerRecursively(gameObject, inspectLayer);
 
         if (inspectionCamera != null)
-        {
             inspectionCamera.gameObject.SetActive(true);
-        }
 
-        // 물체를 카메라의 자식으로 일시 이동 (추후 흔들림 등의 효과가 추가되어 카메라가 움직여도 같이 움직이게 하여 조사 중인 느낌을 주도록)
-        transform.SetParent(Camera.main.transform);
+        if (mainCameraTransform != null)
+            transform.SetParent(mainCameraTransform, true);
 
-        float elapsedTime = 0;
-        float duration = 0.5f;
-
-        while (elapsedTime < duration)
-        {
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-
-            transform.position = Vector3.Lerp(transform.position, inspectPoint.position, t);
-            yield return null;
-        }
-
-        transform.position = inspectPoint.position;
+        transitionRoutine = StartCoroutine(MoveToInspectPoint());
     }
 
-    IEnumerator ExitInspectMode()
+    internal void BeginExitTransition()
     {
-        float elapsedTime = 0;
-        float duration = 0.5f;
+        transitionRoutine = StartCoroutine(ReturnToOriginalTransform());
+    }
+
+    internal void BeginCollection()
+    {
+        transitionRoutine = StartCoroutine(CollectArtifact());
+    }
+
+    internal void StartExiting() => ChangeState(exitingState);
+
+    internal void StartCollecting() => ChangeState(collectingState);
+
+    internal void RotateFromMouse()
+    {
+        if (Mouse.current == null || !Mouse.current.leftButton.isPressed)
+            return;
+
+        Vector2 delta = Mouse.current.delta.ReadValue();
+        transform.Rotate(Vector3.up, -delta.x * rotationSpeed, Space.World);
+        transform.Rotate(Vector3.right, delta.y * rotationSpeed, Space.World);
+    }
+
+    private IEnumerator MoveToInspectPoint()
+    {
+        if (inspectPoint != null)
+            yield return MoveTransform(inspectPoint.position, transform.rotation);
+
+        transitionRoutine = null;
+        ChangeState(activeState);
+    }
+
+    private IEnumerator ReturnToOriginalTransform()
+    {
+        RestoreParentAndLayer();
         if (dimOverlay != null) dimOverlay.SetActive(false);
 
-        // 원래 부모로 복구
-        transform.SetParent(originalParent);
-
-        SetLayerRecursively(gameObject, originalLayer);
-
-        while (elapsedTime < duration)
-        {
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-
-            transform.position = Vector3.Lerp(transform.position, originalPos, t);
-            transform.rotation = Quaternion.Lerp(transform.rotation, originalRot, t);
-            yield return null;
-        }
-
-        transform.position = originalPos;
-        transform.rotation = originalRot;
-
-        if (inspectionCamera != null)
-        {
-            inspectionCamera.gameObject.SetActive(false);
-        }
-
-        if (playerController != null) playerController.enabled = true;
-        isInspecting = false;
+        yield return MoveTransform(snapshot.position, snapshot.rotation);
+        transitionRoutine = null;
+        RestoreAfterInspection();
+        ChangeState(idleState);
     }
 
-    IEnumerator PocketArtifact()
+    private IEnumerator CollectArtifact()
     {
-        // 1. 전역 인벤토리에 유물 추가
-        if (!inventoryList.Contains(artifactDisplayName))
-        {
-            inventoryList.Add(artifactDisplayName);
-        }
+        inventory.Add(artifactDisplayName);
+        RestoreParentAndLayer();
 
-        // 2. 원래 부모로 임시 복구 후 물리적/시각적으로 축소 연출
-        transform.SetParent(originalParent);
-
-        float elapsedTime = 0;
-        float duration = 0.3f;
         Vector3 startScale = transform.localScale;
-
-        while (elapsedTime < duration)
+        const float duration = 0.3f;
+        for (float elapsed = 0f; elapsed < duration; elapsed += Time.deltaTime)
         {
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-            transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
+            transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / duration);
             yield return null;
         }
 
-        // 3. 비주얼과 콜라이더만 비활성화 (스크립트 자체는 활성화 상태를 유지하여 E키 열기 기능 보장)
+        transform.localScale = Vector3.zero;
         SetVisualsActive(false);
-
-        if (dimOverlay != null) dimOverlay.SetActive(false);
-        if (inspectionCamera != null) inspectionCamera.gameObject.SetActive(false);
-        if (playerController != null) playerController.enabled = true;
-
-        isInspecting = false;
+        transitionRoutine = null;
+        RestoreAfterInspection();
+        ChangeState(collectedState);
         Debug.Log($"[{artifactDisplayName}] 획득 완료! 인벤토리에 추가되었습니다.");
     }
 
-    // 평소 화면에서 E키를 누를 때 인벤토리 UI 상태를 조정하는 함수
-    void ToggleInventory(bool open)
+    private IEnumerator MoveTransform(Vector3 targetPosition, Quaternion targetRotation)
     {
-        isInventoryOpen = open;
-        if (dimOverlay != null) dimOverlay.SetActive(open);
-        if (playerController != null) playerController.enabled = !open;
-    }
+        Vector3 startPosition = transform.position;
+        Quaternion startRotation = transform.rotation;
+        float duration = Mathf.Max(0.01f, Vector3.Distance(startPosition, targetPosition) / transitionSpeed);
 
-    // 오브젝트 수집 시 하이어라키의 본체를 끄는 대신, 렌더러와 물리 충돌만 안전하게 숨겨주는 함수
-    void SetVisualsActive(bool active)
-    {
-        if (GetComponent<Renderer>() != null) GetComponent<Renderer>().enabled = active;
-        if (GetComponent<Collider>() != null) GetComponent<Collider>().enabled = active;
-
-        foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = active;
-        foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = active;
-    }
-
-    void SetLayerRecursively(GameObject obj, int newLayer)
-    {
-        obj.layer = newLayer;
-        foreach (Transform child in obj.transform)
+        for (float elapsed = 0f; elapsed < duration; elapsed += Time.deltaTime)
         {
-            SetLayerRecursively(child.gameObject, newLayer);
+            float t = elapsed / duration;
+            transform.SetPositionAndRotation(
+                Vector3.Lerp(startPosition, targetPosition, t),
+                Quaternion.Lerp(startRotation, targetRotation, t));
+            yield return null;
         }
+
+        transform.SetPositionAndRotation(targetPosition, targetRotation);
     }
 
-    // 프로토타입 전용 온스크린 2D 렌더링
-    void OnGUI()
+    private void RestoreParentAndLayer()
     {
-        if (!isInventoryOpen) return;
+        transform.SetParent(snapshot.parent, true);
+        SetLayerRecursively(gameObject, snapshot.layer);
+    }
 
-        // 화면 중앙 레이아웃 계산
-        int width = 450;
-        int height = 300;
+    private void RestoreAfterInspection()
+    {
+        if (transitionRoutine != null)
+        {
+            StopCoroutine(transitionRoutine);
+            transitionRoutine = null;
+        }
+
+        RestoreParentAndLayer();
+        if (dimOverlay != null) dimOverlay.SetActive(false);
+        if (inspectionCamera != null) inspectionCamera.gameObject.SetActive(false);
+        SetPlayerControl(true);
+    }
+
+    private void SetPlayerControl(bool enabled)
+    {
+        if (playerController != null)
+            playerController.enabled = enabled;
+    }
+
+    private void SetVisualsActive(bool active)
+    {
+        foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
+            renderer.enabled = active;
+        foreach (Collider collider in GetComponentsInChildren<Collider>(true))
+            collider.enabled = active;
+    }
+
+    private static void SetLayerRecursively(GameObject target, int layer)
+    {
+        target.layer = layer;
+        foreach (Transform child in target.transform)
+            SetLayerRecursively(child.gameObject, layer);
+    }
+
+    private readonly struct InspectionSnapshot
+    {
+        public readonly Vector3 position;
+        public readonly Quaternion rotation;
+        public readonly Transform parent;
+        public readonly int layer;
+
+        private InspectionSnapshot(Transform target)
+        {
+            position = target.position;
+            rotation = target.rotation;
+            parent = target.parent;
+            layer = target.gameObject.layer;
+        }
+
+        public static InspectionSnapshot Capture(Transform target) => new InspectionSnapshot(target);
+    }
+}
+
+public abstract class InspectState
+{
+    public virtual bool BlocksInventoryToggle => false;
+    public virtual void Enter(InspectSystem context) { }
+    public virtual void Tick(InspectSystem context) { }
+    public virtual void Exit(InspectSystem context) { }
+}
+
+public sealed class IdleInspectState : InspectState
+{
+    public override void Tick(InspectSystem context)
+    {
+        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+        {
+            // 다른 유물이 조사 중이면 PlayerController가 비활성화된다.
+            // 그 프레임의 E 입력을 인벤토리 열기로 해석하지 않는다.
+            if (context.PlayerController == null || context.PlayerController.enabled || context.IsInventoryOpen)
+                context.ToggleInventory();
+            return;
+        }
+
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+            context.TryStartInspection();
+    }
+}
+
+public sealed class EnteringInspectState : InspectState
+{
+    public override bool BlocksInventoryToggle => true;
+    public override void Enter(InspectSystem context) => context.BeginEnterTransition();
+}
+
+public sealed class ActiveInspectState : InspectState
+{
+    public override bool BlocksInventoryToggle => true;
+    public override void Tick(InspectSystem context)
+    {
+        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+            context.StartCollecting();
+        else if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            context.StartExiting();
+        else
+            context.RotateFromMouse();
+    }
+}
+
+public sealed class ExitingInspectState : InspectState
+{
+    public override bool BlocksInventoryToggle => true;
+    public override void Enter(InspectSystem context) => context.BeginExitTransition();
+}
+
+public sealed class CollectingInspectState : InspectState
+{
+    public override bool BlocksInventoryToggle => true;
+    public override void Enter(InspectSystem context) => context.BeginCollection();
+}
+
+public sealed class CollectedInspectState : InspectState { }
+
+/// <summary>
+/// 인벤토리 데이터와 프로토타입 표시 UI를 한 곳에서 관리합니다.
+/// 조사 오브젝트마다 OnGUI가 실행되던 중복 렌더링 문제를 방지합니다.
+/// </summary>
+public sealed class InventoryOverlay : MonoBehaviour
+{
+    private static InventoryOverlay instance;
+    private static readonly List<string> items = new List<string>();
+    private static int lastToggleFrame = -1;
+
+    public static IReadOnlyList<string> Items => items;
+    public static bool IsOpen => instance != null && instance.isVisible;
+    public bool IsVisible => isVisible;
+
+    private bool isVisible;
+    private Texture2D backgroundTexture;
+
+    public static InventoryOverlay GetOrCreate()
+    {
+        if (instance != null)
+            return instance;
+
+        instance = FindFirstObjectByType<InventoryOverlay>();
+        if (instance == null)
+        {
+            GameObject host = new GameObject("Inventory Overlay");
+            instance = host.AddComponent<InventoryOverlay>();
+        }
+        return instance;
+    }
+
+    private void Awake()
+    {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        backgroundTexture = CreateSolidTexture(new Color(0f, 0f, 0f, 0.85f));
+    }
+
+    private void OnDestroy()
+    {
+        if (backgroundTexture != null)
+            Destroy(backgroundTexture);
+        if (instance == this)
+            instance = null;
+    }
+
+    private void Update()
+    {
+        if (UnityEngine.InputSystem.Keyboard.current == null ||
+            !UnityEngine.InputSystem.Keyboard.current.eKey.wasPressedThisFrame ||
+            InspectSystem.IsInspectionInProgress)
+            return;
+
+        // 모든 유물이 획득된 뒤에도 이 오브젝트는 남아 있으므로,
+        // 인벤토리를 여닫는 입력은 더 이상 유물에 의존하지 않는다.
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+        Toggle(player);
+    }
+
+    public void Toggle(PlayerController playerController)
+    {
+        if (Time.frameCount == lastToggleFrame)
+            return;
+
+        lastToggleFrame = Time.frameCount;
+        SetVisible(!isVisible, playerController);
+    }
+
+    public void Add(string artifactName)
+    {
+        if (!string.IsNullOrWhiteSpace(artifactName) && !items.Contains(artifactName))
+            items.Add(artifactName);
+    }
+
+    private void SetVisible(bool visible, PlayerController playerController)
+    {
+        isVisible = visible;
+        if (playerController != null)
+            playerController.enabled = !visible;
+    }
+
+    private void OnGUI()
+    {
+        if (!isVisible)
+            return;
+
+        const int width = 450;
+        const int height = 300;
         int x = (Screen.width - width) / 2;
         int y = (Screen.height - height) / 2;
 
-        // 검은 반투명 박스 그리기
         GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
-        boxStyle.normal.background = MakeTex(2, 2, new Color(0f, 0f, 0f, 0.85f));
-        GUI.Box(new Rect(x, y, width, height), "", boxStyle);
+        boxStyle.normal.background = backgroundTexture;
+        GUI.Box(new Rect(x, y, width, height), string.Empty, boxStyle);
 
-        // 타이틀 레이블 스타일
-        GUIStyle titleStyle = new GUIStyle();
-        titleStyle.fontSize = 24;
-        titleStyle.fontStyle = FontStyle.Bold;
+        GUIStyle titleStyle = new GUIStyle { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperCenter };
         titleStyle.normal.textColor = Color.yellow;
-        titleStyle.alignment = TextAnchor.UpperCenter;
-        GUI.Label(new Rect(x, y + 25, width, 40), "🎒 INVENTORY (PROTOTYPE)", titleStyle);
+        GUI.Label(new Rect(x, y + 25, width, 40), "INVENTORY (PROTOTYPE)", titleStyle);
 
-        // 아이템 텍스트 스타일
-        GUIStyle listStyle = new GUIStyle();
-        listStyle.fontSize = 18;
+        GUIStyle listStyle = new GUIStyle { fontSize = 18, alignment = TextAnchor.UpperCenter };
         listStyle.normal.textColor = Color.white;
-        listStyle.alignment = TextAnchor.UpperCenter;
-
-        if (inventoryList.Count == 0)
-        {
+        if (items.Count == 0)
             GUI.Label(new Rect(x, y + 120, width, 30), "(인벤토리가 비어 있습니다)", listStyle);
-        }
         else
-        {
-            for (int i = 0; i < inventoryList.Count; i++)
-            {
-                GUI.Label(new Rect(x, y + 90 + (i * 28), width, 30), $"•  {inventoryList[i]}", listStyle);
-            }
-        }
+            for (int i = 0; i < items.Count; i++)
+                GUI.Label(new Rect(x, y + 90 + i * 28, width, 30), $"•  {items[i]}", listStyle);
 
-        // 하단 조작 안내 스타일
-        GUIStyle helpStyle = new GUIStyle();
-        helpStyle.fontSize = 14;
+        GUIStyle helpStyle = new GUIStyle { fontSize = 14, alignment = TextAnchor.LowerCenter };
         helpStyle.normal.textColor = Color.gray;
-        helpStyle.alignment = TextAnchor.LowerCenter;
         GUI.Label(new Rect(x, y + height - 35, width, 25), "[E] 닫기", helpStyle);
     }
 
-    // 단색 배경 이미지를 생성하기 위한 프로토타입 전용 유틸 함수
-    private Texture2D MakeTex(int width, int height, Color col)
+    private static Texture2D CreateSolidTexture(Color color)
     {
-        Color[] pix = new Color[width * height];
-        for (int i = 0; i < pix.Length; ++i) pix[i] = col;
-        Texture2D result = new Texture2D(width, height);
-        result.SetPixels(pix);
-        result.Apply();
-        return result;
+        Texture2D texture = new Texture2D(1, 1);
+        texture.SetPixel(0, 0, color);
+        texture.Apply();
+        return texture;
     }
 }
