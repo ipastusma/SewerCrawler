@@ -1,77 +1,43 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class InventoryManager : MonoBehaviour
+/// <summary>인벤토리 데이터만 보관하며 UI나 입력을 처리하지 않습니다.</summary>
+public sealed class InventoryManager : MonoBehaviour
 {
     public static InventoryManager Instance { get; private set; }
+    private readonly List<InventoryItem> items = new List<InventoryItem>();
+    public IReadOnlyList<InventoryItem> Items => items;
+    public event Action InventoryChanged;
 
-    // 실제 인벤토리 데이터
-    private readonly List<InventoryItem> items = new();
-
-    void Awake()
+    private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
     }
 
-    /// 아이템 획득
+    private void OnEnable() => GameEvents.ItemPicked += HandleItemPicked;
+    private void OnDisable() => GameEvents.ItemPicked -= HandleItemPicked;
+
+    private void HandleItemPicked(InventoryItem item) => AddItem(item);
+
     public bool AddItem(InventoryItem item)
     {
-        if (HasItem(item.itemID))
-            return false;
-
+        if (item == null || HasItem(item.itemID)) return false;
         items.Add(item);
-
-        Debug.Log($"획득 : {item.displayName}");
-
+        InventoryChanged?.Invoke();
         return true;
     }
 
-    /// 아이템 제거
-    public bool RemoveItem(string itemID)
+    public bool RemoveItem(string itemId)
     {
-        InventoryItem item = GetItem(itemID);
-
-        if (item == null)
-            return false;
-
+        InventoryItem item = GetItem(itemId);
+        if (item == null) return false;
         items.Remove(item);
-
+        InventoryChanged?.Invoke();
         return true;
     }
 
-    /// 아이템 존재 여부
-    public bool HasItem(string itemID)
-    {
-        foreach (InventoryItem item in items)
-        {
-            if (item.itemID == itemID)
-                return true;
-        }
-
-        return false;
-    }
-
-    /// 아이템 가져오기
-    public InventoryItem GetItem(string itemID)
-    {
-        foreach (InventoryItem item in items)
-        {
-            if (item.itemID == itemID)
-                return item;
-        }
-
-        return null;
-    }
-
-    /// 인벤토리 전체 목록
-    public IReadOnlyList<InventoryItem> GetItems()
-    {
-        return items;
-    }
+    public bool HasItem(string itemId) => GetItem(itemId) != null;
+    public InventoryItem GetItem(string itemId) => items.Find(item => item.itemID == itemId);
 }

@@ -1,67 +1,63 @@
 using UnityEngine;
 
-public class InteractionManager : MonoBehaviour
+/// <summary>현재 진행 중인 단 하나의 상호작용을 소유합니다.</summary>
+public sealed class InteractionManager : MonoBehaviour
 {
     public static InteractionManager Instance { get; private set; }
-
-    // 현재 조사 중인 아이템
     public Inspectable CurrentInspectable { get; private set; }
+    public MonitorInteraction CurrentMonitor { get; private set; }
 
-    // 현재 상호작용 중인 대상
-    public IInteractable CurrentInteractable { get; private set; }
-
-    void Awake()
+    private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
     }
 
-    // 새로운 상호작용 시작
-    public void BeginInteraction(IInteractable interactable)
-    {
-        CurrentInteractable = interactable;
+    public void BeginInteraction(IInteractable interactable) => interactable?.Interact();
 
-        interactable.Interact();
-    }
-
-    // 조사 시작
-    public void BeginInspect(Inspectable inspectable)
+    public bool BeginInspect(Inspectable inspectable)
     {
+        if (inspectable == null || CurrentInspectable != null) return false;
         CurrentInspectable = inspectable;
-
         GameStateManager.Instance.ChangeState(GameState.Inspect);
-
         inspectable.EnterInspect();
+        return true;
     }
 
-    // 조사 종료
     public void EndInspect()
     {
-        if (CurrentInspectable == null)
-            return;
-
+        if (CurrentInspectable == null || !CurrentInspectable.CanAcceptInspectionInput) return;
         CurrentInspectable.ExitInspect();
-
         CurrentInspectable = null;
-
         GameStateManager.Instance.ChangeState(GameState.Normal);
     }
 
-    // 아이템 획득
     public void PickCurrentItem()
     {
-        if (CurrentInspectable == null)
-            return;
-
-        CurrentInspectable.PickUp();
-
+        if (CurrentInspectable == null || !CurrentInspectable.CanAcceptInspectionInput) return;
+        Inspectable item = CurrentInspectable;
         CurrentInspectable = null;
+        item.PickUp();
+        GameStateManager.Instance.ChangeState(GameState.Normal);
+    }
 
+    public void RotateCurrentInspectable(Vector2 pointerDelta) => CurrentInspectable?.Rotate(pointerDelta);
+
+    public bool BeginMonitor(MonitorInteraction monitor)
+    {
+        if (monitor == null || CurrentMonitor != null) return false;
+        CurrentMonitor = monitor;
+        GameStateManager.Instance.ChangeState(GameState.Monitor);
+        monitor.EnterMonitor();
+        return true;
+    }
+
+    public void EndMonitor()
+    {
+        if (CurrentMonitor == null) return;
+        MonitorInteraction monitor = CurrentMonitor;
+        CurrentMonitor = null;
+        monitor.ExitMonitor();
         GameStateManager.Instance.ChangeState(GameState.Normal);
     }
 }

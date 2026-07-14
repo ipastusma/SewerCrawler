@@ -9,6 +9,7 @@ public interface IInteractable
 /// </summary>
 public abstract class Inspectable : UnityEngine.MonoBehaviour, IInteractable
 {
+    public virtual bool CanAcceptInspectionInput => true;
     public virtual void Interact()
     {
         if (InteractionManager.Instance == null)
@@ -28,4 +29,6 @@ public abstract class Inspectable : UnityEngine.MonoBehaviour, IInteractable
 
     /// <summary>조사 중인 오브젝트를 획득할 때 호출됩니다.</summary>
     public abstract void PickUp();
+
+    public abstract void Rotate(UnityEngine.Vector2 pointerDelta);
 }

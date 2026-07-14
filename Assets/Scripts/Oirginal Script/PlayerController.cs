@@ -1,120 +1,67 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem; // 새로운 Input System 사용
+
+/// <summary>격자 이동만 담당합니다. 입력은 InputManager가 상태에 따라 전달합니다.</summary>
 public class PlayerController : MonoBehaviour
 {
-    [Header("이동 설정")]
-    public float gridSize = 2f;   // 한 칸의 크기 (이동 단위의 크기)
-    public float moveDuration = 0.3f;   // 한 칸 이동하는 데 걸리는 시간 (초)
-    public float rotateDuration = 0.2f;   // 90도 회전하는 데 걸리는 시간 (초)
+    public static PlayerController Instance { get; private set; }
+    [Header("Movement")]
+    public float gridSize = 2f;
+    public float moveDuration = 0.3f;
+    public float rotateDuration = 0.2f;
+    [Header("Collision")]
+    public LayerMask wallLayer;
+    private bool isMoving;
 
-    [Header("충돌 설정")]
-    public LayerMask wallLayer; // 벽 레이어를 지정하여 충돌 감지
-
-    private bool isMoving = false;    // 현재 이동/회전 중인지 여부
-    public bool IsPlayerMoving()
+    private void Awake()
     {
-        return isMoving;
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
     }
 
-    void Update()
+    public bool IsPlayerMoving() => isMoving;
+    public void HandleMovement(GameInput input)
     {
         if (isMoving) return;
-
-        if (Keyboard.current == null) return; // 키보드가 연결되어 있지 않다면 예외 처리
-
-        if (Keyboard.current.tKey.wasPressedThisFrame)
-        {
-            if (transform.position == new Vector3(0, 0.5f, -4))
-            {
-                transform.position = new Vector3(0.5f, 0, 0.5f);
-                transform.rotation = Quaternion.Euler(0, 90, 0);
-            }
-            else
-            {
-                transform.position = new Vector3(0, 0.5f, -4);
-                transform.rotation = Quaternion.Euler(0, 0, 0);
-            }
-        }
-
-        if (Keyboard.current.wKey.wasPressedThisFrame)
-        {
-            if (!CheckWall(transform.forward))
-            {
-                StartCoroutine(MovePlayer(transform.forward * gridSize));
-            }
-        }
-        else if (Keyboard.current.sKey.wasPressedThisFrame)
-        {
-            if (!CheckWall(-transform.forward))
-            {
-                StartCoroutine(MovePlayer(-transform.forward * gridSize));
-            }
-        }
-        else if (Keyboard.current.aKey.wasPressedThisFrame)
-        {
-            StartCoroutine(RotatePlayer(-90f));
-        }
-        else if (Keyboard.current.dKey.wasPressedThisFrame)
-        {
-            StartCoroutine(RotatePlayer(90f));
-        }
+        if (input.DebugTeleport) { TeleportForDebug(); return; }
+        if (input.MoveForward && !HasWall(transform.forward)) StartCoroutine(Move(transform.forward * gridSize));
+        else if (input.MoveBackward && !HasWall(-transform.forward)) StartCoroutine(Move(-transform.forward * gridSize));
+        else if (input.TurnLeft) StartCoroutine(Rotate(-90f));
+        else if (input.TurnRight) StartCoroutine(Rotate(90f));
     }
 
-    bool CheckWall(Vector3 direction)
+    private bool HasWall(Vector3 direction) => Physics.Raycast(transform.position, direction, gridSize, wallLayer);
+    private void TeleportForDebug()
     {
-        Vector3 rayStart = transform.position;
-
-        bool hasWall = Physics.Raycast(rayStart, direction, gridSize, wallLayer);
-        return hasWall;
+        if (transform.position == new Vector3(0, 0.5f, -4)) transform.SetPositionAndRotation(new Vector3(0.5f, 0, 0.5f), Quaternion.Euler(0, 90, 0));
+        else transform.SetPositionAndRotation(new Vector3(0, 0.5f, -4), Quaternion.identity);
     }
 
-    // 부드러운 칸 이동을 위한 코루틴
-    IEnumerator MovePlayer(Vector3 direction)
+    private IEnumerator Move(Vector3 offset)
     {
         isMoving = true;
-
-        Vector3 startPosition = transform.position;
-        Vector3 targetPosition = startPosition + direction;
-        float elapsedTime = 0f;
-
-        while (elapsedTime < moveDuration)
+        Vector3 start = transform.position;
+        Vector3 target = start + offset;
+        for (float elapsed = 0; elapsed < moveDuration; elapsed += Time.deltaTime)
         {
-            elapsedTime += Time.deltaTime;
-            // Lerp를 이용해 시작점부터 목표점까지 부드럽게 이동
-            transform.position = Vector3.Lerp(startPosition, targetPosition, elapsedTime / moveDuration);
+            transform.position = Vector3.Lerp(start, target, elapsed / moveDuration);
             yield return null;
         }
-
-        // 이동 후 위치를 소수점 첫째 자리까지 반올림하여 오차를 줄임
-        targetPosition.x = Mathf.Round(targetPosition.x * 10f) / 10f;
-        targetPosition.y = Mathf.Round(targetPosition.y * 10f) / 10f;
-        targetPosition.z = Mathf.Round(targetPosition.z * 10f) / 10f;
-
-        // 오차를 없애기 위해 마지막에 목표 위치로 정확히 고정
-        transform.position = targetPosition;
+        transform.position = new Vector3(Mathf.Round(target.x * 10f) / 10f, Mathf.Round(target.y * 10f) / 10f, Mathf.Round(target.z * 10f) / 10f);
         isMoving = false;
     }
 
-    // 부드러운 90도 회전을 위한 코루틴
-    IEnumerator RotatePlayer(float angle)
+    private IEnumerator Rotate(float angle)
     {
         isMoving = true;
-
-        Quaternion startRotation = transform.rotation;
-        Quaternion targetRotation = startRotation * Quaternion.Euler(0, angle, 0);
-        float elapsedTime = 0f;
-
-        while (elapsedTime < rotateDuration)
+        Quaternion start = transform.rotation;
+        Quaternion target = start * Quaternion.Euler(0, angle, 0);
+        for (float elapsed = 0; elapsed < rotateDuration; elapsed += Time.deltaTime)
         {
-            elapsedTime += Time.deltaTime;
-            // Lerp를 이용해 현재 각도에서 목표 각도까지 부드럽게 회전
-            transform.rotation = Quaternion.Lerp(startRotation, targetRotation, elapsedTime / rotateDuration);
+            transform.rotation = Quaternion.Lerp(start, target, elapsed / rotateDuration);
             yield return null;
         }
-
-        // 오차 고정
-        transform.rotation = targetRotation;
+        transform.rotation = target;
         isMoving = false;
     }
 }
