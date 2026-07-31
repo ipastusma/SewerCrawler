@@ -46,7 +46,7 @@ public sealed class GameStateManager : MonoBehaviour
         StateChanged?.Invoke(previous, CurrentState);
     }
 
-    private GameFlowState GetState(GameState state) => state switch
+    private GameFlowState GetState(GameState state) => state switch //GameState를 기반으로 해당하는 GameFlowState를 반환
     {
         GameState.Inspect => inspectState,
         GameState.Inventory => inventoryState,

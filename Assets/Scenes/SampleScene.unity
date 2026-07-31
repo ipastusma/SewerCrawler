@@ -2215,7 +2215,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DoorController
   openDistance: 0.5
   moveDuration: 0.5
-  maxDistance: 1.25
 --- !u!43 &502985389
 Mesh:
   m_ObjectHideFlags: 0
@@ -39126,6 +39125,8 @@ MonoBehaviour:
   transitionSpeed: 5
   rotationSpeed: 0.5
   inspectionCamera: {fileID: 625824059}
+  itemData: {fileID: 0}
+  artifactId: 
   artifactDisplayName: sphere
 --- !u!1 &1100002561
 GameObject:
@@ -39793,6 +39794,8 @@ MonoBehaviour:
   transitionSpeed: 5
   rotationSpeed: 0.5
   inspectionCamera: {fileID: 625824059}
+  itemData: {fileID: 0}
+  artifactId: 
   artifactDisplayName: cube
 --- !u!43 &1279690364
 Mesh:
